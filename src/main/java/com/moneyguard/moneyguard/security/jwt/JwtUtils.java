@@ -1,5 +1,6 @@
 package com.moneyguard.moneyguard.security.jwt;
 
+import java.util.Calendar;
 import java.util.Date;
 
 import com.moneyguard.moneyguard.security.jwt.services.UserDetailsImpl;
@@ -18,10 +19,13 @@ public class JwtUtils {
     private int jwtExpirationMs;
     public String generateJwtToken(Authentication authentication) {
         UserDetailsImpl userPrincipal = (UserDetailsImpl) authentication.getPrincipal();
+        Calendar expiry = Calendar.getInstance();
+        expiry.add(Calendar.YEAR,1);
+        Date jwtExpiry = new Date(expiry.getTimeInMillis());
         return Jwts.builder()
                 .setSubject((userPrincipal.getEmail()))
                 .setIssuedAt(new Date())
-                .setExpiration(new Date((new Date()).getTime() + jwtExpirationMs))
+                .setExpiration(jwtExpiry)
                 .signWith(SignatureAlgorithm.HS512, jwtSecret)
                 .compact();
     }
