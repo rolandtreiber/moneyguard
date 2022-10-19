@@ -77,6 +77,7 @@ public class RecurringTransactionServiceImpl implements RecurringTransactionServ
             }
         }
         recurringTransactionRepository.save(recurringTransaction);
+        generateTransactions(recurringTransaction);
         RecurringTransactionDAO recurringTransactionDAO = new RecurringTransactionDAO();
         BeanUtils.copyProperties(recurringTransaction, recurringTransactionDAO);
         return recurringTransactionDAO;
@@ -135,7 +136,6 @@ public class RecurringTransactionServiceImpl implements RecurringTransactionServ
 
     @Override
     public RecurringTransactionDetailResponse get(RecurringTransaction recurringTransaction) {
-        generateTransactions(recurringTransaction);
         return new RecurringTransactionDetailResponse(recurringTransaction);
     }
 
@@ -177,6 +177,7 @@ public class RecurringTransactionServiceImpl implements RecurringTransactionServ
                 recurringTransaction.getFrequencyBasis()
         );
         dates.forEach(d -> {
+            System.out.println(recurringTransaction.getName()+" - "+Utils.format(d));
             Transaction transaction = new Transaction();
             BeanUtils.copyProperties(recurringTransaction, transaction);
             if (recurringTransaction.getType() == 2) {
@@ -192,7 +193,7 @@ public class RecurringTransactionServiceImpl implements RecurringTransactionServ
             } else {
                 transaction.setImportanceLevel(null);
             }
-            transaction.setUser(authService.getAuthUser());
+            transaction.setUser(recurringTransaction.getUser());
             transaction.setCreatedAt(d);
             transaction.setUpdatedAt(d);
             transactionRepository.save(transaction);
@@ -207,8 +208,6 @@ public class RecurringTransactionServiceImpl implements RecurringTransactionServ
                 }
             }
             transactionRepository.save(transaction);
-            TransactionDAO transactionDAO = new TransactionDAO();
-            BeanUtils.copyProperties(transaction, transactionDAO);
         });
         long time = new Date().getTime();
         Date today = new Date((time - time % (24 * 60 * 60 * 1000)) - 1);

@@ -3,6 +3,7 @@ package com.moneyguard.moneyguard;
 import com.moneyguard.moneyguard.model.RecurringTransaction;
 import com.moneyguard.moneyguard.repository.RecurringTransactionRepository;
 import com.moneyguard.moneyguard.service.RecurringTransactionService;
+import com.moneyguard.moneyguard.utils.Utils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Configuration;
@@ -11,6 +12,7 @@ import org.springframework.scheduling.annotation.EnableAsync;
 import org.springframework.scheduling.annotation.EnableScheduling;
 import org.springframework.scheduling.annotation.Scheduled;
 
+import java.util.Date;
 import java.util.List;
 
 @EnableScheduling
@@ -29,6 +31,8 @@ public class SchedulerConfig {
     @Async
     public void processAutomaticallyRecurringTransactions()
     {
+        Date now = new Date();
+        System.out.println("Processing automatic transactions at: "+ Utils.format(now));
         List<RecurringTransaction> recurringTransactions = recurringTransactionRepository.findAll();
         recurringTransactions.forEach(rc -> {
             recurringTransactionService.generateTransactions(rc);
