@@ -15,7 +15,6 @@ public class CreateRecurringTransactionRequest {
     @NotNull(message = "Tags field is mandatory")
     private String[] tags;
 
-    @NotBlank(message = "Importance level is mandatory")
     private String importanceLevel;
 
     @NotNull(message = "Frequency is mandatory")

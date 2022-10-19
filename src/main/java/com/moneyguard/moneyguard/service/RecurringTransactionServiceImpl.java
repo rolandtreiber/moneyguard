@@ -1,15 +1,14 @@
 package com.moneyguard.moneyguard.service;
 
 import com.moneyguard.moneyguard.dao.RecurringTransactionDAO;
+import com.moneyguard.moneyguard.dao.TransactionDAO;
 import com.moneyguard.moneyguard.model.*;
-import com.moneyguard.moneyguard.repository.CategoryRepository;
-import com.moneyguard.moneyguard.repository.ImportanceLevelRepository;
-import com.moneyguard.moneyguard.repository.RecurringTransactionRepository;
-import com.moneyguard.moneyguard.repository.TagRepository;
+import com.moneyguard.moneyguard.repository.*;
 import com.moneyguard.moneyguard.request.CreateRecurringTransactionRequest;
 import com.moneyguard.moneyguard.request.UpdateRecurringTransactionRequest;
 import com.moneyguard.moneyguard.response.DropdownListResource;
 import com.moneyguard.moneyguard.response.RecurringTransactionDetailResponse;
+import com.moneyguard.moneyguard.utils.Utils;
 import javassist.NotFoundException;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -18,7 +17,9 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDateTime;
 import java.util.*;
+import java.util.function.Consumer;
 
 @Service("recurringTransactionService")
 public class RecurringTransactionServiceImpl implements RecurringTransactionService {
@@ -33,6 +34,9 @@ public class RecurringTransactionServiceImpl implements RecurringTransactionServ
     TagRepository tagRepository;
 
     @Autowired
+    TransactionRepository transactionRepository;
+
+    @Autowired
     AuthService authService;
 
     @Autowired
@@ -42,21 +46,23 @@ public class RecurringTransactionServiceImpl implements RecurringTransactionServ
     public RecurringTransactionDAO create(CreateRecurringTransactionRequest request) throws NotFoundException {
         RecurringTransaction recurringTransaction = new RecurringTransaction();
         BeanUtils.copyProperties(request, recurringTransaction);
-        ImportanceLevel importanceLevel = importanceLevelRepository.findById(UUID.fromString(request.getImportanceLevel()));
         if (request.getType() == 2) {
-            if (importanceLevel == null) {
-                throw new NotFoundException("Invalid importance level");
+            ImportanceLevel importanceLevel = importanceLevelRepository.findById(UUID.fromString(request.getImportanceLevel()));
+            if (request.getType() == 2) {
+                if (importanceLevel == null) {
+                    throw new NotFoundException("Invalid importance level");
+                }
+                recurringTransaction.setImportanceLevel(importanceLevel);
+            } else {
+                recurringTransaction.setImportanceLevel(null);
             }
             recurringTransaction.setImportanceLevel(importanceLevel);
-        } else {
-            recurringTransaction.setImportanceLevel(null);
         }
-        recurringTransaction.setImportanceLevel(importanceLevel);
         recurringTransaction.setFrequencyType(request.getFrequency());
         recurringTransaction.setUser(authService.getAuthUser());
         recurringTransaction.setCreatedAt(new Date());
         recurringTransaction.setUpdatedAt(new Date());
-        recurringTransaction.setLastProcessed(new Date());
+        recurringTransaction.setLastProcessed(request.getStartDate());
         recurringTransactionRepository.save(recurringTransaction);
         for (String uuid: request.getCategories()) {
             Category category = categoryRepository.findById(UUID.fromString(uuid));
@@ -81,8 +87,8 @@ public class RecurringTransactionServiceImpl implements RecurringTransactionServ
         BeanUtils.copyProperties(request, recurringTransaction);
         recurringTransaction.setFrequencyType(request.getFrequency());
         recurringTransaction.setUpdatedAt(new Date());
-        ImportanceLevel importanceLevel = importanceLevelRepository.findById(UUID.fromString(request.getImportanceLevel()));
         if (request.getType() == 2) {
+            ImportanceLevel importanceLevel = importanceLevelRepository.findById(UUID.fromString(request.getImportanceLevel()));
             if (importanceLevel == null) {
                 throw new NotFoundException("Invalid importance level");
             }
@@ -129,6 +135,7 @@ public class RecurringTransactionServiceImpl implements RecurringTransactionServ
 
     @Override
     public RecurringTransactionDetailResponse get(RecurringTransaction recurringTransaction) {
+        generateTransactions(recurringTransaction);
         return new RecurringTransactionDetailResponse(recurringTransaction);
     }
 
@@ -158,5 +165,55 @@ public class RecurringTransactionServiceImpl implements RecurringTransactionServ
             dropdownListData.add(listItem);
         });
         return dropdownListData;
+    }
+
+    @Override
+    public Boolean generateTransactions(RecurringTransaction recurringTransaction) {
+        List<Date> dates = Utils.getDates(
+                recurringTransaction.getLastProcessed(),
+                recurringTransaction.getStartDate(),
+                recurringTransaction.getEndDate(),
+                recurringTransaction.getFrequencyType(),
+                recurringTransaction.getFrequencyBasis()
+        );
+        dates.forEach(d -> {
+            Transaction transaction = new Transaction();
+            BeanUtils.copyProperties(recurringTransaction, transaction);
+            if (recurringTransaction.getType() == 2) {
+                ImportanceLevel importanceLevel = importanceLevelRepository.findById(UUID.fromString(recurringTransaction.getImportanceLevel().getId().toString()));
+                if (importanceLevel == null) {
+                    try {
+                        throw new NotFoundException("Invalid importance level");
+                    } catch (NotFoundException e) {
+                        e.printStackTrace();
+                    }
+                }
+                transaction.setImportanceLevel(importanceLevel);
+            } else {
+                transaction.setImportanceLevel(null);
+            }
+            transaction.setUser(authService.getAuthUser());
+            transaction.setCreatedAt(d);
+            transaction.setUpdatedAt(d);
+            transactionRepository.save(transaction);
+            for (Category category: recurringTransaction.getCategories()) {
+                if (category != null) {
+                    transaction.addCategory(category);
+                }
+            }
+            for (Tag tag: recurringTransaction.getTags()) {
+                if (tag != null) {
+                    transaction.addTag(tag);
+                }
+            }
+            transactionRepository.save(transaction);
+            TransactionDAO transactionDAO = new TransactionDAO();
+            BeanUtils.copyProperties(transaction, transactionDAO);
+        });
+        long time = new Date().getTime();
+        Date today = new Date((time - time % (24 * 60 * 60 * 1000)) - 1);
+        recurringTransaction.setLastProcessed(today);
+        recurringTransactionRepository.save(recurringTransaction);
+        return null;
     }
 }

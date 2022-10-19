@@ -30,9 +30,11 @@ public class RecurringTransactionDetailResponse {
     public RecurringTransactionDetailResponse(RecurringTransaction recurringTransaction) {
         BeanUtils.copyProperties(recurringTransaction, this);
         setFrequency(recurringTransaction.getFrequencyType());
-        ImportanceLevelDAO importanceLevelDAO = new ImportanceLevelDAO();
-        BeanUtils.copyProperties(recurringTransaction.getImportanceLevel(), importanceLevelDAO);
-        setImportanceLevel(importanceLevelDAO);
+        if (recurringTransaction.getType() == 2) {
+            ImportanceLevelDAO importanceLevelDAO = new ImportanceLevelDAO();
+            BeanUtils.copyProperties(recurringTransaction.getImportanceLevel(), importanceLevelDAO);
+            setImportanceLevel(importanceLevelDAO);
+        }
         if (recurringTransaction.getCategories() != null) {
             recurringTransaction.getCategories().forEach(e -> {
                 CategoryDAO categoryDAO = new CategoryDAO();

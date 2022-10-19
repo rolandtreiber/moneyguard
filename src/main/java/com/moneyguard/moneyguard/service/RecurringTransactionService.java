@@ -18,5 +18,6 @@ public interface RecurringTransactionService {
     RecurringTransactionDetailResponse get(RecurringTransaction recurringTransaction);
     List<RecurringTransactionDAO> list(Integer page, String search);
     List<DropdownListResource> getSelectData(String search);
+    Boolean generateTransactions(RecurringTransaction recurringTransaction);
 
 }
